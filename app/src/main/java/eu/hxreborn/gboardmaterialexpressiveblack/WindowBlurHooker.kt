@@ -30,17 +30,22 @@ object WindowBlurHooker {
             }.getOrNull() ?: return@intercept result
 
             inputView.viewTreeObserver.addOnGlobalLayoutListener(
-            object : ViewTreeObserver.OnGlobalLayoutListener {
-            override fun onGlobalLayout() {
-            val height = inputView.height
-            if (height > 0) {
-                inputView.viewTreeObserver
-                    .removeOnGlobalLayoutListener(this)
-                window.setLayout(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    height
-                )
-            }
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        val height = inputView.height
+                        if (height > 0) {
+                            inputView.viewTreeObserver
+                                .removeOnGlobalLayoutListener(this)
+                            window.setLayout(
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                height
+                            )
+                        }
+                    }
+                }
+            )
+
+            result
         }
     }
-)
+}
