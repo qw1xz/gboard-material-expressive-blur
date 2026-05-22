@@ -2,7 +2,9 @@ package eu.hxreborn.gboardmaterialexpressiveblack
 
 import android.inputmethodservice.InputMethodService
 import android.os.Build
-import android.view.ViewTreeObserver
+import android.os.Handler
+import android.os.Looper
+import android.view.WindowManager
 import io.github.libxposed.api.XposedModule
 
 object WindowBlurHooker {
@@ -20,30 +22,28 @@ object WindowBlurHooker {
                 ?: return@intercept result
             val window = service.window?.window
                 ?: return@intercept result
-
-            window.setBackgroundBlurRadius(60)
-
             val inputView = runCatching {
                 InputMethodService::class.java
                     .getMethod("getCurrentInputView")
                     .invoke(service) as? android.view.View
             }.getOrNull() ?: return@intercept result
 
-            inputView.viewTreeObserver.addOnGlobalLayoutListener(
-                object : ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        val height = inputView.height
-                        if (height > 0) {
-                            inputView.viewTreeObserver
-                                .removeOnGlobalLayoutListener(this)
-                            window.setLayout(
-                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                height
-                            )
-                        }
+            window.setBackgroundBlurRadius(60)
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    val height = inputView.height
+                    if (height > 0) {
+                        val wm = service.getSystemService(
+                            android.content.Context.WINDOW_SERVICE
+                        ) as WindowManager
+                        val lp = window.decorView.layoutParams
+                            as WindowManager.LayoutParams
+                        lp.height = height
+                        wm.updateViewLayout(window.decorView, lp)
                     }
-                }
-            )
+                } catch (_: Exception) {}
+            }, 150)
 
             result
         }
