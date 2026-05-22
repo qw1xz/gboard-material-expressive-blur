@@ -20,8 +20,11 @@ object WindowBlurHooker {
                 ?: return@intercept result
             val window = service.window?.window
                 ?: return@intercept result
-            val inputView = service.currentInputView
-                ?: return@intercept result
+            val inputView = runCatching {
+                InputMethodService::class.java
+                    .getMethod("getCurrentInputView")
+                    .invoke(service) as? android.view.View
+            }.getOrNull() ?: return@intercept result
 
             inputView.post {
                 val height = inputView.height
