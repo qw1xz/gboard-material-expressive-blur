@@ -4,6 +4,7 @@ import android.content.res.TypedArray
 import android.util.Log
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
+import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
 class GboardAmoledModule : XposedModule() {
@@ -33,6 +34,8 @@ class GboardAmoledModule : XposedModule() {
         }.onFailure {
             log(Log.ERROR, TAG, "Hook failed: ${it.message}")
         }
+
+        WindowBlurHooker.hook(this)
     }
 
     companion object {
