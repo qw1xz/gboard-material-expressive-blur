@@ -2,7 +2,7 @@ package eu.hxreborn.gboardmaterialexpressiveblack
 
 import android.inputmethodservice.InputMethodService
 import android.os.Build
-import android.view.Gravity
+import android.view.ViewTreeObserver
 import io.github.libxposed.api.XposedModule
 
 object WindowBlurHooker {
@@ -20,22 +20,30 @@ object WindowBlurHooker {
                 ?: return@intercept result
             val window = service.window?.window
                 ?: return@intercept result
+
+            window.setBackgroundBlurRadius(60)
+
             val inputView = runCatching {
                 InputMethodService::class.java
                     .getMethod("getCurrentInputView")
                     .invoke(service) as? android.view.View
             }.getOrNull() ?: return@intercept result
 
-            inputView.post {
-                val height = inputView.height
-                if (height > 0) {
-                    val params = window.attributes
-                    params.height = height
-                    params.gravity = Gravity.BOTTOM
-                    window.attributes = params
-                    window.setBackgroundBlurRadius(60)
+            inputView.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        val height = inputView.height
+                        if (height > 0) {
+                            inputView.viewTreeObserver
+                                .removeOnGlobalLayoutListener(this)
+                            val params = window.attributes
+                            params.height = height
+                            window.attributes = params
+                        }
+                    }
                 }
-            }
+            )
+
             result
         }
     }
