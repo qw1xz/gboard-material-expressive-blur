@@ -7,7 +7,7 @@ import io.github.libxposed.api.XposedModule
 import java.lang.reflect.Method
 
 object TypedArrayColorHooker {
-    private const val AMOLED_BLACK = 0xFF000000.toInt()
+    private const val AMOLED_BLACK = 0x80000000.toInt()
     private const val SURFACE_CONTAINER_PREFIX = "system_surface_container"
     private const val HIGH_VARIANT_MARKER = "high"
 
