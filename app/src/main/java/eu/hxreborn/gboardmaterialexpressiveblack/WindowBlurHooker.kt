@@ -4,6 +4,7 @@ import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import io.github.libxposed.api.XposedModule
 
 object WindowBlurHooker {
@@ -23,26 +24,36 @@ object WindowBlurHooker {
                 InputMethodService::class.java.getMethod("getCurrentInputView").invoke(service) as? View
             }.getOrNull() ?: return@intercept result
 
-            // 1. Включаем размытие фона окна
-            window.setBackgroundBlurRadius(60)
+            // ДОБАВЛЕНО: Принудительно включаем флаг размытия фона
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            
+            // Оставляем этот метод, он работает в паре с флагом на некоторых прошивках
+            window.setBackgroundBlurRadius(60) 
 
-            // Функция для обновления высоты окна
             fun updateWindowHeight(newHeight: Int) {
                 if (newHeight <= 0) return
                 val lp = window.attributes
+                var needsUpdate = false
+
                 if (lp.height != newHeight) {
                     lp.height = newHeight
-                    // КРИТИЧЕСКИ ВАЖНО: прижимаем обрезанное окно к низу экрана
-                    lp.gravity = Gravity.BOTTOM 
-                    // Присвоение attributes автоматически вызывает updateViewLayout под капотом
-                    window.attributes = lp 
+                    lp.gravity = Gravity.BOTTOM
+                    needsUpdate = true
+                }
+
+                // ДОБАВЛЕНО: Передаем радиус напрямую в LayoutParams
+                if (lp.blurBehindRadius != 60) {
+                    lp.blurBehindRadius = 60
+                    needsUpdate = true
+                }
+
+                if (needsUpdate) {
+                    window.attributes = lp
                 }
             }
 
-            // 2. Сразу применяем высоту, если View уже отрисована (чтобы избежать моргания на весь экран)
             updateWindowHeight(inputView.height)
 
-            // 3. Динамически следим за изменениями размера без хардкодных задержек
             inputView.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
                 val newHeight = bottom - top
                 val oldHeight = oldBottom - oldTop
