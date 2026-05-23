@@ -1,10 +1,10 @@
 package eu.hxreborn.gboardmaterialexpressiveblack
 
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import io.github.libxposed.api.XposedModule
 
 object WindowBlurHooker {
@@ -18,28 +18,46 @@ object WindowBlurHooker {
         module.hook(method).intercept { chain ->
             val result = chain.proceed()
             val service = chain.thisObject as? InputMethodService ?: return@intercept result
-            
-            // Ищем корневое View клавиатуры
+            val window = service.window?.window ?: return@intercept result
+
             val inputView = runCatching {
                 InputMethodService::class.java.getMethod("getCurrentInputView").invoke(service) as? View
             }.getOrNull() ?: return@intercept result
 
-            // Создаем эффект размытия (радиус 30-40, можно менять)
-            val blurEffect = RenderEffect.createBlurEffect(
-                40f, 40f, Shader.TileMode.CLAMP
-            )
+            // Функция, которая «пробивает» блюр в систему
+            fun applyBlurState() {
+                // Применяем флаги снова, так как изменение параметров их иногда сбрасывает
+                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                window.setBackgroundBlurRadius(60)
+                
+                // Дополнительный вызов для безопасности
+                val lp = window.attributes
+                lp.blurBehindRadius = 60
+                window.attributes = lp
+            }
 
-            // Применяем эффект напрямую к контейнеру клавиатуры
-            inputView.setRenderEffect(blurEffect)
-            
-            // Если у Gboard фон внутри View имеет свой цвет, его нужно убрать, 
-            // иначе блюр будет "под" цветом и его не будет видно
-            inputView.setBackgroundColor(0x00000000) // Полностью прозрачный
-            
-            // Если есть вложенные элементы, которые перекрывают, 
-            // можно пройтись циклом и сделать их фоны прозрачными
-            if (inputView is android.view.ViewGroup) {
-                inputView.setBackgroundColor(0x00000000)
+            // Функция изменения высоты с принудительным обновлением
+            fun updateWindowHeight(height: Int) {
+                if (height <= 0) return
+                val lp = window.attributes
+                lp.height = height
+                lp.gravity = Gravity.BOTTOM
+                window.attributes = lp
+                
+                // СРАЗУ ПОСЛЕ изменения высоты обновляем блюр
+                applyBlurState()
+            }
+
+            // Первичная настройка
+            updateWindowHeight(inputView.height)
+            applyBlurState()
+
+            // Слушатель изменений
+            inputView.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+                val newHeight = bottom - top
+                if (newHeight != (oldBottom - oldTop)) {
+                    updateWindowHeight(newHeight)
+                }
             }
 
             result
