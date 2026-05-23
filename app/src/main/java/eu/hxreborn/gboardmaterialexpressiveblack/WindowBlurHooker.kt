@@ -1,10 +1,11 @@
 package eu.hxreborn.gboardmaterialexpressiveblack
 
+import android.graphics.Color
+import android.graphics.Outline
+import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Build
-import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 import io.github.libxposed.api.XposedModule
 
 object WindowBlurHooker {
@@ -24,42 +25,47 @@ object WindowBlurHooker {
                 InputMethodService::class.java.getMethod("getCurrentInputView").invoke(service) as? View
             }.getOrNull() ?: return@intercept result
 
-            // ДОБАВЛЕНО: Принудительно включаем флаг размытия фона
-            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            
-            // Оставляем этот метод, он работает в паре с флагом на некоторых прошивках
-            window.setBackgroundBlurRadius(60) 
+            // 1. Включаем блюр (он будет работать только внутри заданного нами Outline)
+            window.setBackgroundBlurRadius(60)
 
-            fun updateWindowHeight(newHeight: Int) {
-                if (newHeight <= 0) return
-                val lp = window.attributes
-                var needsUpdate = false
+            // Массив для вычисления координат клавиатуры на экране (выносим, чтобы не нагружать память)
+            val location = IntArray(2)
 
-                if (lp.height != newHeight) {
-                    lp.height = newHeight
-                    lp.gravity = Gravity.BOTTOM
-                    needsUpdate = true
-                }
-
-                // ДОБАВЛЕНО: Передаём радиус напрямую в LayoutParams
-                if (lp.blurBehindRadius != 60) {
-                    lp.blurBehindRadius = 60
-                    needsUpdate = true
-                }
-
-                if (needsUpdate) {
-                    window.attributes = lp
+            // 2. Создаем прозрачный фон с умным контуром
+            val customBackground = object : ColorDrawable(Color.TRANSPARENT) {
+                override fun getOutline(outline: Outline) {
+                    if (inputView.width > 0 && inputView.height > 0) {
+                        // Получаем точные координаты inputView внутри окна
+                        inputView.getLocationInWindow(location)
+                        val left = location[0]
+                        val top = location[1]
+                        val right = left + inputView.width
+                        val bottom = top + inputView.height
+                        
+                        // Задаем контур строго по границам клавиатуры
+                        // Если у Gboard закругленные верхние углы, можно использовать:
+                        // outline.setRoundRect(left, top, right, bottom, 24f) // где 24f - радиус углов
+                        outline.setRect(left, top, right, bottom)
+                        
+                        // Обязательно для SurfaceFlinger, иначе контур будет проигнорирован
+                        outline.alpha = 1.0f 
+                    } else {
+                        super.getOutline(outline)
+                    }
                 }
             }
 
-            updateWindowHeight(inputView.height)
+            // 3. Подменяем фон окна на наш кастомный
+            window.setBackgroundDrawable(customBackground)
+            
+            // Отключаем обрезку контента по контуру, чтобы всплывающие буквы при удержании не обрезались
+            window.decorView.clipToOutline = false
 
-            inputView.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
-                val newHeight = bottom - top
-                val oldHeight = oldBottom - oldTop
-
-                if (newHeight != oldHeight) {
-                    updateWindowHeight(newHeight)
+            // 4. Слушаем любые изменения размеров или положения клавиатуры (открытие эмодзи, сдвиг)
+            inputView.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+                    // Перерисовываем контур блюра под новые размеры
+                    window.decorView.invalidateOutline()
                 }
             }
 
