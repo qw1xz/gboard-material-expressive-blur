@@ -41,7 +41,7 @@ object WindowBlurHooker {
                     needsUpdate = true
                 }
 
-                // ДОБАВЛЕНО: Передаем радиус напрямую в LayoutParams
+                // ДОБАВЛЕНО: Передаём радиус напрямую в LayoutParams
                 if (lp.blurBehindRadius != 60) {
                     lp.blurBehindRadius = 60
                     needsUpdate = true
